@@ -192,10 +192,6 @@ fig.update_layout(
 
 st.plotly_chart(fig)
 
-fig.update_xaxes(range=[-0.15, 0.15])    # fixed ±10 %
-
-
-
 # ---- TRADE SUGGESTIONS ----
 st.markdown("### Trade Suggestions")
 trade_date = st.slider(
