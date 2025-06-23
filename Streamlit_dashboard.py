@@ -75,22 +75,27 @@ table_date = st.slider(
     format="YYYY-MM-DD",
     key="table_date"
 )
+
+# --- pull weights ----------------------------------------------------------
 table_snapshot = df.loc[pd.to_datetime(table_date)]
-TARGET_WEIGHTS = get_equal_weight_targets(table_snapshot)
+total_w        = table_snapshot.sum()                        # <-- NEW (denominator)
+targets        = pd.Series(get_equal_weight_targets(table_snapshot))
 
 table_df = table_snapshot.to_frame("Current")
-table_df["Target"]   = pd.Series(TARGET_WEIGHTS)
-table_df["Drift"]    = table_df["Current"] - table_df["Target"]
+table_df["Target"] = targets
+table_df["Drift"]  = table_df["Current"] - table_df["Target"]
 
-# ── format as % ───────────────────────────────────────────────
-table_df["Current%"] = table_df["Current"].apply(pct)
-table_df["Target%"]  = table_df["Target"].apply(pct)
-table_df["Drift%"]   = table_df["Drift"].apply(pct)   # ← new line
-# ──────────────────────────────────────────────────────────────
+# --- percentage formatting -------------------------------------------------
+table_df["Current%"] = (table_df["Current"] / total_w).apply(pct)
+table_df["Target%"]  = (table_df["Target"]  / total_w).apply(pct)
+table_df["Drift%"]   = (table_df["Drift"]   / total_w).apply(pct)
 
-table_df["$"] = (table_df["Current"] * 50_000).round(2)
+# --- dollar exposure -------------------------------------------------------
+table_df["$"] = (table_df["Current"] * 50_000).apply(lambda x: f"{x:,.2f}")
 
+# --- render ----------------------------------------------------------------
 st.dataframe(table_df[["Current%", "Target%", "Drift%", "$"]])
+
 
 
 # ---- ALLOCATION HISTORY ----
