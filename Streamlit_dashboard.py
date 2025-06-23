@@ -153,6 +153,7 @@ fig = go.Figure(
     )
 )
 fig.add_vline(x=0, line_width=1, line_color="white")
+fig.update_xaxes(range=[-0.15, 0.15])    # fixed ±10 %
 
 # --- dummy traces for legend ----------------------------------------------
 legend_items = [
