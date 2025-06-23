@@ -152,7 +152,7 @@ fig = go.Figure(
         showlegend=False,           # keep bar itself out of legend
     )
 )
-fig.add_vline(x=0, line_width=1, line_color="black")
+fig.add_vline(x=0, line_width=1, line_color="white")
 
 # --- dummy traces for legend ----------------------------------------------
 legend_items = [
