@@ -98,41 +98,38 @@ stack = px.area(hist.reset_index(), x="Time", y=top_cols,
 stack.update_yaxes(tickformat=".0%", range=[0, 1])
 st.plotly_chart(stack)
 
-# ---- DRIFT MONITOR (colour-aware) ----
+# ---- DRIFT MONITOR (colour-aware, with legend) ----
 st.markdown("### Drift Monitor")
 
+# --- user inputs -----------------------------------------------------------
 drift_date = st.slider(
     "Select Date for Drift Monitor",
-    min_value=min(date_list),
-    max_value=max(date_list),
-    value=max(date_list),
-    format="YYYY-MM-DD",
-    key="drift_date"
+    min_value=min(date_list), max_value=max(date_list),
+    value=max(date_list), format="YYYY-MM-DD", key="drift_date"
 )
 drift_band = st.slider(
-    "Drift Threshold (±)",
-    min_value=0.0, max_value=0.10, value=0.02, step=0.005,
-    key="drift_slider"
+    "Drift Threshold (±)", 0.0, 0.10, 0.02, step=0.005, key="drift_slider"
 )
 
+# --- data prep -------------------------------------------------------------
 snapshot = df.loc[pd.to_datetime(drift_date)]
-targets   = pd.Series(get_equal_weight_targets(snapshot))
-drift     = snapshot - targets                     # + = overweight, – = underweight
+targets  = pd.Series(get_equal_weight_targets(snapshot))
+drift    = snapshot - targets                        # +  sell • –  buy
 
-def colour_for(value: float, band: float) -> str:
-    """Map signed drift to a colour string."""
-    abs_val = abs(value)
-    if value >= 0:         # overweight  → sell palette (reds)
-        if abs_val > band:          return "firebrick"
-        elif abs_val > band*0.5:    return "tomato"
-        else:                       return "lightsalmon"
-    else:                  # underweight → buy palette (blues)
-        if abs_val > band:          return "midnightblue"
-        elif abs_val > band*0.5:    return "dodgerblue"
-        else:                       return "lightskyblue"
+def colour_for(val, band):
+    abs_val = abs(val)
+    if val >= 0:               # SELL palette
+        if abs_val > band:         return "firebrick"     # urgent
+        elif abs_val > band*0.5:   return "tomato"        # watch
+        else:                      return "lightsalmon"   # minor
+    else:                        # BUY palette
+        if abs_val > band:         return "midnightblue"
+        elif abs_val > band*0.5:   return "dodgerblue"
+        else:                      return "lightskyblue"
 
 colours = [colour_for(v, drift_band) for v in drift]
 
+# --- main bar trace --------------------------------------------------------
 fig = go.Figure(
     go.Bar(
         x=drift.values,
@@ -140,17 +137,49 @@ fig = go.Figure(
         orientation="h",
         marker_color=colours,
         hovertemplate="%{y}<br>Drift: %{x:.2%}<extra></extra>",
+        showlegend=False,           # keep bar itself out of legend
     )
 )
 fig.add_vline(x=0, line_width=1, line_color="black")
+
+# --- dummy traces for legend ----------------------------------------------
+legend_items = [
+    ("Buy urgent (>|band|)",     "midnightblue"),
+    ("Buy watch (0.5–1×)",       "dodgerblue"),
+    ("Buy minor (<0.5×)",        "lightskyblue"),
+    ("Sell urgent (>|band|)",    "firebrick"),
+    ("Sell watch (0.5–1×)",      "tomato"),
+    ("Sell minor (<0.5×)",       "lightsalmon"),
+]
+
+for name, color in legend_items:
+    fig.add_trace(
+        go.Scatter(
+            x=[None], y=[None],                # no visible data
+            mode="markers",
+            marker=dict(size=10, color=color),
+            showlegend=True,
+            name=name,
+            legendgroup=name,
+        )
+    )
+
+# --- layout tweaks ---------------------------------------------------------
 fig.update_layout(
     height=600,
     xaxis_title="Weight drift (Current − Target)",
     xaxis_tickformat=".1%",
     yaxis_title="",
+    legend=dict(
+        title="Tier key",
+        borderwidth=0,
+        orientation="v",          # vertical; set "h" for horizontal
+        yanchor="top", y=1, xanchor="left", x=1.02  # place to the right
+    ),
 )
 
 st.plotly_chart(fig)
+
 
 
 # ---- TRADE SUGGESTIONS ----
