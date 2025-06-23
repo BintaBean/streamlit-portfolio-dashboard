@@ -98,8 +98,9 @@ stack = px.area(hist.reset_index(), x="Time", y=top_cols,
 stack.update_yaxes(tickformat=".0%", range=[0, 1])
 st.plotly_chart(stack)
 
-# ---- DRIFT MONITOR ----
+# ---- DRIFT MONITOR (colour-aware) ----
 st.markdown("### Drift Monitor")
+
 drift_date = st.slider(
     "Select Date for Drift Monitor",
     min_value=min(date_list),
@@ -108,27 +109,49 @@ drift_date = st.slider(
     format="YYYY-MM-DD",
     key="drift_date"
 )
-drift_band_local = st.slider("Drift Threshold", 0.0, 0.1, 0.02, step=0.005, key="drift_slider")
-drift_snapshot = df.loc[pd.to_datetime(drift_date)]
-TARGET_WEIGHTS = get_equal_weight_targets(drift_snapshot)
+drift_band = st.slider(
+    "Drift Threshold (±)",
+    min_value=0.0, max_value=0.10, value=0.02, step=0.005,
+    key="drift_slider"
+)
 
-drift_df = drift_snapshot.to_frame("Current")
-drift_df["Target"] = pd.Series(TARGET_WEIGHTS)
-drift_df["Drift"] = drift_df["Current"] - drift_df["Target"]
+snapshot = df.loc[pd.to_datetime(drift_date)]
+targets   = pd.Series(get_equal_weight_targets(snapshot))
+drift     = snapshot - targets                     # + = overweight, – = underweight
 
-bar = go.Figure(go.Bar(
-    x=drift_df["Drift"].values,
-    y=drift_df.index,
-    orientation='h',
-    marker_color=[
-        'red' if abs(x) > drift_band_local else
-        'orange' if abs(x) > drift_band_local * 0.5 else 'green'
-        for x in drift_df["Drift"]
-    ],
-))
-bar.add_vline(x=0, line_width=1, line_color="black")
-bar.update_layout(height=600, xaxis_tickformat=".1%")
-st.plotly_chart(bar)
+def colour_for(value: float, band: float) -> str:
+    """Map signed drift to a colour string."""
+    abs_val = abs(value)
+    if value >= 0:         # overweight  → sell palette (reds)
+        if abs_val > band:          return "firebrick"
+        elif abs_val > band*0.5:    return "tomato"
+        else:                       return "lightsalmon"
+    else:                  # underweight → buy palette (blues)
+        if abs_val > band:          return "midnightblue"
+        elif abs_val > band*0.5:    return "dodgerblue"
+        else:                       return "lightskyblue"
+
+colours = [colour_for(v, drift_band) for v in drift]
+
+fig = go.Figure(
+    go.Bar(
+        x=drift.values,
+        y=drift.index,
+        orientation="h",
+        marker_color=colours,
+        hovertemplate="%{y}<br>Drift: %{x:.2%}<extra></extra>",
+    )
+)
+fig.add_vline(x=0, line_width=1, line_color="black")
+fig.update_layout(
+    height=600,
+    xaxis_title="Weight drift (Current − Target)",
+    xaxis_tickformat=".1%",
+    yaxis_title="",
+)
+
+st.plotly_chart(fig)
+
 
 # ---- TRADE SUGGESTIONS ----
 st.markdown("### Trade Suggestions")
